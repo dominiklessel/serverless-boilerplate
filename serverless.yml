@@ -1,0 +1,91 @@
+
+service: mf-sl-bp
+frameWorkVersion: ">=1.1.0 <2.0.0"
+
+plugins:
+  - serverless-pseudo-parameters
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  region: eu-central-1
+  stage: ${opt:stage, 'dev'}
+  iamRoleStatements:
+  - Effect: Allow
+    Action:
+      - dynamodb:GetItem
+      - dynamodb:PutItem
+    Resource: arn:aws:dynamodb:${self:custom.region}:${self:custom.accountId}:table/${self:custom.tableName}
+
+custom:
+  region: ${self:provider.region}
+  apiVersion: ${file(./serverless.vars.js):apiVersion}
+  stage: ${self:provider.stage}
+  prefix: ${self:custom.stage}-${self:service}
+  tableName: ${self:custom.prefix}-testTable
+  accountId: "#{AWS::AccountId}"
+
+functions:
+  list-items:
+    handler: functions/items/list.handler
+    environment:
+      region: ${self:custom.region}
+      tableName: ${self:custom.tableName}
+    events:
+      - http:
+          path: items
+          method: get
+          private: false
+          cors: true
+
+  get-item-by-id:
+    handler: functions/items/get-by-id.handler
+    environment:
+      region: ${self:custom.region}
+      tableName: ${self:custom.tableName}
+    events:
+      - http:
+          path: items/{idItem}
+          method: get
+          private: false
+          cors: true
+
+  create-item:
+    handler: functions/items/create.handler
+    environment:
+      region: ${self:custom.region}
+      tableName: ${self:custom.tableName}
+    events:
+      - http:
+          path: items
+          method: post
+          private: false
+          cors: true
+
+  delete-item-by-id:
+    handler: functions/items/delete.handler
+    environment:
+      region: ${self:custom.region}
+      tableName: ${self:custom.tableName}
+    events:
+      - http:
+          path: items/{idItem}
+          method: delete
+          private: false
+          cors: true
+
+resources:
+  Resources:
+    DynamoDbTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.tableName}
+        AttributeDefinitions:
+          - AttributeName: idItem
+            AttributeType: S
+        KeySchema:
+          - AttributeName: idItem
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
